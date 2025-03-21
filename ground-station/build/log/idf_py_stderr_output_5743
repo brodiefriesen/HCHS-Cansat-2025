@@ -1,0 +1,18 @@
+CMake Error at /home/hayden/esp/v5.4/esp-idf/tools/cmake/build.cmake:610 (message):
+  ERROR: 'git --work-tree /tmp/tmptzsu__qu --git-dir
+  /home/hayden/.cache/Espressif/ComponentManager/b_git_13c150c3 checkout
+  --force a06fc122096db8d68362701aa8c8d79a26ae2a74 --
+  managed_components/lora/components/lora' failed with exit code 1
+
+  error: pathspec 'managed_components/lora/components/lora' did not match any
+  file(s) known to git
+
+  
+
+  
+
+Call Stack (most recent call first):
+  /home/hayden/esp/v5.4/esp-idf/tools/cmake/project.cmake:710 (idf_build_process)
+  CMakeLists.txt:7 (project)
+
+

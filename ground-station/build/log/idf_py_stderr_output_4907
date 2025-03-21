@@ -1,0 +1,11 @@
+CMake Error at /home/hayden/esp/v5.4/esp-idf/tools/cmake/component.cmake:155 (message):
+  Directory '/home/hayden/esp/v5.4/esp-idf/components/lora' does not contain
+  a component.
+Call Stack (most recent call first):
+  /home/hayden/esp/v5.4/esp-idf/tools/cmake/build.cmake:308 (__component_add)
+  build/managed_components_list.temp.cmake:1 (idf_build_component)
+  /home/hayden/esp/v5.4/esp-idf/tools/cmake/build.cmake:613 (include)
+  /home/hayden/esp/v5.4/esp-idf/tools/cmake/project.cmake:710 (idf_build_process)
+  CMakeLists.txt:7 (project)
+
+

@@ -1,0 +1,8 @@
+CMake Error at /home/hayden/esp/v5.4/esp-idf/tools/cmake/project.cmake:465 (message):
+  Directory specified in EXTRA_COMPONENT_DIRS doesn't exist:
+  /home/hayden/ground-station/main/components/lora
+Call Stack (most recent call first):
+  /home/hayden/esp/v5.4/esp-idf/tools/cmake/project.cmake:549 (__project_init)
+  CMakeLists.txt:8 (project)
+
+
