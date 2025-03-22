@@ -15,12 +15,15 @@
 #include "esp_netif.h"
 #include <string.h>
 
+//this file is hell itself, the only two functions you would ever want to come here for are sse_handler and maybe instruction_post_handler. 
+//ignore the cries of anguish coming from everything else for your own safety.
+
 static const char *TAG = "http";
 //may the lord forgive me for any reference/pointer mistakes I make, I am too young, inexperienced, and sane to understand them
 static QueueHandle_t *outgoing;
 static QueueHandle_t *incoming;
 
-static esp_err_t hello_get_handler(httpd_req_t *req)
+static esp_err_t status_get_handler(httpd_req_t *req)
 {
     char*  buf;
     size_t buf_len;
@@ -95,26 +98,16 @@ static esp_err_t hello_get_handler(httpd_req_t *req)
 }
 
 static const httpd_uri_t hello = {
-    .uri       = "/hello",
+    .uri       = "/status",
     .method    = HTTP_GET,
     .handler   = hello_get_handler,
     /* Let's pass response string in user
      * context to demonstrate it's usage */
-    .user_ctx  = "Hello World"
+    .user_ctx  = ":)"
 };
 
 esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 {
-    if (strcmp("/hello", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/hello URI is not available");
-        /* Return ESP_OK to keep underlying socket open */
-        return ESP_OK;
-    } else if (strcmp("/echo", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/echo URI is not available");
-        /* Return ESP_FAIL to close underlying socket */
-        return ESP_FAIL;
-    }
-    /* For any other URI send 404 and close socket */
     httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Some 404 error message");
     return ESP_FAIL;
 }
@@ -128,6 +121,7 @@ static esp_err_t sse_handler(httpd_req_t *req)
     while (1) {
         char sse_data[100];
         char in[100];
+        //recieve from queue
         if(xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
             esp_err_t err;
             int len = snprintf(sse_data, sizeof(sse_data), in);

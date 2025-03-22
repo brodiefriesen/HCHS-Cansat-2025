@@ -9,6 +9,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+//wifi :) the credential definitions are in the header file, there is really no other reason to be in here
+
 static const char *TAG = "wifi";
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
