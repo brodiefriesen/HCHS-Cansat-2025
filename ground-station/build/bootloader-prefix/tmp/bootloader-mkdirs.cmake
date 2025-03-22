@@ -5,18 +5,18 @@ cmake_minimum_required(VERSION 3.5)
 
 file(MAKE_DIRECTORY
   "/home/hayden/esp/v5.4/esp-idf/components/bootloader/subproject"
-  "/home/hayden/ground-station/build/bootloader"
-  "/home/hayden/ground-station/build/bootloader-prefix"
-  "/home/hayden/ground-station/build/bootloader-prefix/tmp"
-  "/home/hayden/ground-station/build/bootloader-prefix/src/bootloader-stamp"
-  "/home/hayden/ground-station/build/bootloader-prefix/src"
-  "/home/hayden/ground-station/build/bootloader-prefix/src/bootloader-stamp"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/tmp"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/src/bootloader-stamp"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/src"
+  "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "/home/hayden/ground-station/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "/home/hayden/ground-station/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "/home/hayden/HCHS-Cansat-2025/ground-station/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

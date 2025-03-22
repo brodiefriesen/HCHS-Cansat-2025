@@ -1,4 +1,4 @@
-/* * Data converted from /home/hayden/ground-station/main/certs/prvtkey.pem
+/* * Data converted from /home/hayden/HCHS-Cansat-2025/ground-station/main/certs/prvtkey.pem
  * (null byte appended)
  */
 .data
