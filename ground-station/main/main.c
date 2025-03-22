@@ -29,7 +29,7 @@ static const char *TAG = "main";
 
 /* An HTTP GET handler */
 
-static uint8_t msg_queue_len = 5;
+static uint8_t msg_queue_len = 10;
 
 QueueHandle_t incoming;
 QueueHandle_t outgoing;
@@ -89,7 +89,7 @@ void app_main(void)
     uint32_t frequencyInHz = 915000000;
 	ESP_LOGI(TAG, "Frequency is 915MHz");
 
-    float tcxoVoltage = 3.3; // don't use TCXO
+    float tcxoVoltage = 3.3;
 	bool useRegulatorLDO = true;
 
     if (LoRaBegin(frequencyInHz, txPowerInDbm, tcxoVoltage, useRegulatorLDO) != 0) {

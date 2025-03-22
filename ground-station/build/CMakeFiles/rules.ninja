@@ -1889,7 +1889,7 @@ rule C_STATIC_LIBRARY_LINKER____idf_ra01s_
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = /usr/bin/cmake --regenerate-during-build -S/home/hayden/ground-station -B/home/hayden/ground-station/build
+  command = /usr/bin/cmake --regenerate-during-build -S/home/hayden/HCHS-Cansat-2025/ground-station -B/home/hayden/HCHS-Cansat-2025/ground-station/build
   description = Re-running CMake...
   generator = 1
 

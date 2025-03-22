@@ -1,4 +1,4 @@
-# Install script for directory: /home/hayden/ground-station/main
+# Install script for directory: /home/hayden/HCHS-Cansat-2025/ground-station/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
