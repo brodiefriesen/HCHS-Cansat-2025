@@ -1,54 +1,43 @@
-/* Thanks thaaraak for all of your LoRa and OLED code from https://github.com/thaaraak/Lora!
-*/
-
 #include <esp_wifi.h>
-#include <esp_event.h>
 #include <esp_log.h>
 #include <esp_system.h>
 #include <nvs_flash.h>
-#include <sys/param.h>
-#include "nvs_flash.h"
-#include "esp_netif.h"
-#include "esp_eth.h"
-#include "esp_mac.h"
-#include "esp_tls_crypto.h"
-#include <esp_http_server.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
-#include "lwip/err.h"
-#include "lwip/sys.h"
-#include "esp_wifi_types.h"
 #include "ra01s.h"
-
+#include "esp_netif.h"
+#include <esp_event.h>
 #include "wifi.h"
 #include "http.h"
 
 static const char *TAG = "main";
 
-/* An HTTP GET handler */
-
+//queue variable definitions
 static uint8_t msg_queue_len = 10;
-
 QueueHandle_t incoming;
 QueueHandle_t outgoing;
 
+//this task gets the network up and running(see wifi.c for more info)
 void start_network_task (void *pvParameters) {
-    ESP_LOGI(TAG, "init softAP");
+    ESP_LOGI(pcTaskGetName(NULL), "init softAP");
     ESP_ERROR_CHECK(wifi_init_softap());
     vTaskDelete(NULL);
 }
 
+//this task gets the http server going(see http.c for more info)
 void webserver_task (void *pvParameters) {
     httpd_handle_t server = NULL;
     server = start_webserver(&outgoing, &incoming);
     vTaskDelete(NULL);
 }
 
+//this is the lora management task
+//it may be worthwhile to split this into a seperate tx and rx task?
 void lora_task(void *pvParameters) {
     while(1){
         char out[100];
+        //recieve outgoing data from queue
         if(xQueueReceive(outgoing, (void *)&out, 0) == pdTRUE) {
             int txLen = sizeof(out);
             ESP_LOGI(pcTaskGetName(NULL), "%d byte packet sent...", txLen);
@@ -68,8 +57,10 @@ void lora_task(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(500));
         }
         char in[100];
+        //recieve incoming data
         uint8_t rxLen = LoRaReceive((uint8_t *)in, sizeof(in));
         if ( rxLen > 0 ) { 
+            //send recieved data to incoing queue
 			if(xQueueSend(incoming, (void *)in, 10) != pdTRUE){
                 ESP_LOGI(TAG, "Queue full!");
             }
@@ -112,17 +103,15 @@ void app_main(void)
     outgoing = xQueueCreate(msg_queue_len, sizeof(char[100]));
     incoming = xQueueCreate(msg_queue_len, sizeof(char[100]));
 
+    //I dont know what all this does and I am too fearful to touch it
     ESP_LOGI(TAG, "NVS init");
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
-    
     ESP_LOGI(TAG, "Eventloop create");
-
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-   
+
+    //create tasks
     xTaskCreate(start_network_task, "start network task", 5000, NULL, 10, NULL);
-
     xTaskCreate(webserver_task, "webserver task", 10000, NULL, 10, NULL);
-
     xTaskCreate(lora_task, "lora task", 10000, NULL, 10, NULL);
 }
