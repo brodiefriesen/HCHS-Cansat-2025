@@ -6,135 +6,63 @@
 #include <esp_log.h>
 #include <esp_system.h>
 #include "lwip/sys.h"
-#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
-#include <sys/param.h>
 #include "nvs_flash.h"
 #include "esp_netif.h"
-#include <string.h>
-
-//this file is hell itself, the only two functions you would ever want to come here for are sse_handler and maybe instruction_post_handler. 
-//ignore the cries of anguish coming from everything else for your own safety.
+#include <sys/param.h>
 
 static const char *TAG = "http";
-//may the lord forgive me for any reference/pointer mistakes I make, I am too young, inexperienced, and sane to understand them
+
+// Global queues for incoming/outgoing messages
 static QueueHandle_t *outgoing;
 static QueueHandle_t *incoming;
 
+// Buffer to store the latest received LoRa message
+static char latest_message[100] = "No data received";
+
+// ------------------------- STATUS ENDPOINT -------------------------
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
-    char*  buf;
-    size_t buf_len;
-
-    /* Get header value string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        /* Copy null terminated value string into buffer */
-        if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Host: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-2") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-2", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-2: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-1") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-1", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-1: %s", buf);
-        }
-        free(buf);
-    }
-
-    /* Read URL query string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found URL query => %s", buf);
-            char param[32];
-            /* Get value of expected key from query string */
-            if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query1=%s", param);
-            }
-            if (httpd_query_key_value(buf, "query3", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query3=%s", param);
-            }
-            if (httpd_query_key_value(buf, "query2", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query2=%s", param);
-            }
-        }
-        free(buf);
-    }
-
-    /* Set some custom headers */
-    httpd_resp_set_hdr(req, "Custom-Header-1", "Custom-Value-1");
-    httpd_resp_set_hdr(req, "Custom-Header-2", "Custom-Value-2");
-
-    /* Send response with custom headers and body set as the
-     * string passed in user context*/
-    const char* resp_str = (const char*) req->user_ctx;
-    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
-
-    /* After sending the HTTP response the old HTTP request
-     * headers are lost. Check if HTTP request headers can be read now. */
-    if (httpd_req_get_hdr_value_len(req, "Host") == 0) {
-        ESP_LOGI(TAG, "Request headers lost");
-    }
+    ESP_LOGI(TAG, "Status requested");
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, ":) please poll sse endpoint or latest for data", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
-static const httpd_uri_t hello = {
+static const httpd_uri_t status = {
     .uri       = "/status",
     .method    = HTTP_GET,
-    .handler   = hello_get_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-    .user_ctx  = ":)"
+    .handler   = status_get_handler,
+    .user_ctx  = NULL
 };
 
-esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
-{
-    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Some 404 error message");
-    return ESP_FAIL;
-}
-
+// ------------------------- SSE ENDPOINT -------------------------
 static esp_err_t sse_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/event-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
+    char in[100];
+
     while (1) {
-        char sse_data[100];
-        char in[100];
-        //recieve from queue
-        if(xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
-            esp_err_t err;
-            int len = snprintf(sse_data, sizeof(sse_data), in);
-            if ((err = httpd_resp_send_chunk(req, sse_data, len)) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to send sse data (returned %02X)", err);
+        if (xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
+            snprintf(latest_message, sizeof(latest_message), "%s", in); // Store latest message
+
+            char sse_data[120];
+            int len = snprintf(sse_data, sizeof(sse_data), "data: %s\n\n", in);
+            if (httpd_resp_send_chunk(req, sse_data, len) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to send SSE data");
                 break;
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(500)); // Send data every  500 milliseconds
+        vTaskDelay(pdMS_TO_TICKS(500)); // Send data every 500ms
     }
 
-    httpd_resp_send_chunk(req, NULL, 0); // End response*/
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
+    vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 static const httpd_uri_t sse = {
@@ -144,38 +72,53 @@ static const httpd_uri_t sse = {
     .user_ctx  = NULL
 };
 
+// ------------------------- LATEST MESSAGE ENDPOINT -------------------------
+static esp_err_t latest_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, latest_message, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static const httpd_uri_t latest = {
+    .uri       = "/latest",
+    .method    = HTTP_GET,
+    .handler   = latest_get_handler,
+    .user_ctx  = NULL
+};
+
+// ------------------------- INSTRUCTION ENDPOINT -------------------------
 static esp_err_t instruction_post_handler(httpd_req_t *req)
 {
-    char *ACK = "ACK";
     char buf[100];
     int ret, remaining = req->content_len;
 
     while (remaining > 0) {
-        /* Read the data for the request */
-        if ((ret = httpd_req_recv(req, buf,
-                        MIN(remaining, sizeof(buf)))) <= 0) {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                /* Retry receiving if timeout occurred */
-                continue;
-            }
+        if ((ret = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf) - 1))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) continue;
             return ESP_FAIL;
         }
 
-        /* Send back the same data */
-        httpd_resp_send_chunk(req, "ACK", strlen(ACK));
-        remaining -= ret;
+        buf[ret] = '\0'; // Null-terminate received data
+        // snprintf(latest_message, sizeof(latest_message), "%s", buf); // Store latest message
 
-        /* Log data received */
-        if(xQueueSend(*outgoing, (void *)buf, 10) != pdTRUE){
-            ESP_LOGI(TAG, "Queue full!");
-        }
-        ESP_LOGI(TAG, "=========== RECEIVED DATA ==========");
-        ESP_LOGI(TAG, "%.*s", ret, buf);
-        ESP_LOGI(TAG, "====================================");
+        ESP_LOGI(TAG, "Received instruction: %s", buf);
+
+// Ensure null termination (safety check)
+buf[99] = '\0';
+
+if (xQueueSend(*outgoing, (void *)buf, pdMS_TO_TICKS(10)) != pdTRUE) {
+    ESP_LOGE(TAG, "Outgoing queue full! Dropping message.");
+} else {
+    ESP_LOGI(TAG, "Message added to outgoing queue.");
+}
+
+
+        ESP_LOGI(TAG, "Received Data: %s", buf);
+        remaining -= ret;
     }
 
-    // End response
-    httpd_resp_send_chunk(req, NULL, 0);
+    httpd_resp_send(req, "ACK", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -186,6 +129,7 @@ static const httpd_uri_t instruction = {
     .user_ctx  = NULL
 };
 
+// ------------------------- WEB SERVER START/STOP -------------------------
 httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in)
 {
     httpd_handle_t server = NULL;
@@ -193,28 +137,27 @@ httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in)
     config.lru_purge_enable = true;
     outgoing = out;
     incoming = in;
-    // Start the httpd server
-    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
+
+    ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
-        // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &hello);
+        httpd_register_uri_handler(server, &status);
         httpd_register_uri_handler(server, &sse);
+        httpd_register_uri_handler(server, &latest);
         httpd_register_uri_handler(server, &instruction);
         return server;
     }
 
-    ESP_LOGI(TAG, "Error starting server!");
+    ESP_LOGE(TAG, "Error starting server!");
     return NULL;
 }
 
 esp_err_t stop_webserver(httpd_handle_t server)
 {
-    // Stop the httpd server
     return httpd_stop(server);
 }
 
-
+// ------------------------- NETWORK EVENT HANDLERS -------------------------
 static void disconnect_handler(void* arg, esp_event_base_t event_base,
                                int32_t event_id, void* event_data)
 {
@@ -224,19 +167,7 @@ static void disconnect_handler(void* arg, esp_event_base_t event_base,
         if (stop_webserver(*server) == ESP_OK) {
             *server = NULL;
         } else {
-            ESP_LOGE(TAG, "Failed to stop http server");
+            ESP_LOGE(TAG, "Failed to stop HTTP server");
         }
     }
 }
-
-/*
-static void connect_handler(void* arg, esp_event_base_t event_base,
-                            int32_t event_id, void* event_data)
-{
-    httpd_handle_t* server = (httpd_handle_t*) arg;
-    if (*server == NULL) {
-        ESP_LOGI(TAG, "Starting webserver");
-        *server = start_webserver();
-    }
-}
-*/

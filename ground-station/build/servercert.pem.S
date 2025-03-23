@@ -1,4 +1,4 @@
-/* * Data converted from /home/hayden/HCHS-Cansat-2025/ground-station/main/certs/servercert.pem
+/* * Data converted from /home/brodie/esp/HCHS-Cansat-2025/ground-station/main/certs/servercert.pem
  * (null byte appended)
  */
 .data

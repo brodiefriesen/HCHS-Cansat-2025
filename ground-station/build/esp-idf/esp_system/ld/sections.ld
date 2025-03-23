@@ -1,6 +1,6 @@
 /* Automatically generated file; DO NOT EDIT */
 /* Espressif IoT Development Framework Linker Script */
-/* Generated from: /home/hayden/HCHS-Cansat-2025/ground-station/build/esp-idf/esp_system/ld/sections.ld.in */
+/* Generated from: /home/brodie/esp/HCHS-Cansat-2025/ground-station/build/esp-idf/esp_system/ld/sections.ld.in */
 
 /*
  * SPDX-FileCopyrightText: 2021 Espressif Systems (Shanghai) CO LTD
