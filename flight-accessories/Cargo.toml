@@ -1,0 +1,10 @@
+[package]
+name = "flight-accessories"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.97"
+tokio = { version = "1.44.2", features = ["rt", "macros"] }
+tracing = { version = "0.1.41", features = ["async-await"] }
+tracing-subscriber = "0.3.19"
