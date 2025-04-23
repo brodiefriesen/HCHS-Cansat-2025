@@ -1,14 +1,20 @@
 {
     "C_Cpp.intelliSenseEngine": "default",
-    "idf.espIdfPath": "/home/hayden/esp/v5.4/esp-idf",
+    "idf.espIdfPath": "/home/brodie/esp/esp-idf",
     "idf.pythonInstallPath": "/usr/bin/python3",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
     ],
     "idf.port": "/dev/ttyUSB0",
-    "idf.toolsPath": "/home/hayden/.espressif",
+    "idf.toolsPath": "/home/brodie/.espressif",
     "idf.flashType": "UART",
     "idf.customExtraVars": {
         "IDF_TARGET": "esp32s3"
+    },
+    "files.associations": {
+        "esp_system.h": "c",
+        "mpu9250.h": "c",
+        "i2c.h": "c",
+        "task.h": "c"
     }
 }

@@ -1,0 +1,4 @@
+{
+    "idf.port": "/dev/ttyUSB0",
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc"
+}

@@ -163,13 +163,14 @@ uint8_t spi_transfer(uint8_t address)
 
 int16_t LoRaBegin(uint32_t frequencyInHz, int8_t txPowerInDbm, float tcxoVoltage, bool useRegulatorLDO) 
 {
+	ESP_LOGI(TAG, "beginning");
 	if ( txPowerInDbm > 22 )
 		txPowerInDbm = 22;
 	if ( txPowerInDbm < -3 )
 		txPowerInDbm = -3;
-	
+	//gpio_set_pull_mode(SX126x_BUSY, GPIO_PULLDOWN_ONLY);
 	Reset();
-	
+	ESP_LOGI(TAG, "beginning2");
 	uint8_t wk[2];
 	ReadRegister(SX126X_REG_LORA_SYNC_WORD_MSB, wk, 2); // 0x0740
 	uint16_t syncWord = (wk[0] << 8) + wk[1];
@@ -416,11 +417,13 @@ void SetTxPower(int8_t txPowerInDbm)
 
 void Reset(void)
 {
+	ESP_LOGI(TAG, "Initial SX126x_BUSY = %d", gpio_get_level(SX126x_BUSY));
 	delay(10);
 	gpio_set_level(SX126x_RESET,0);
 	delay(20);
 	gpio_set_level(SX126x_RESET,1);
 	delay(10);
+	ESP_LOGI(TAG, "Final SX126x_BUSY = %d", gpio_get_level(SX126x_BUSY));
 	// ensure BUSY is low (state meachine ready)
 	WaitForIdle(BUSY_WAIT, "Reset", true);
 }

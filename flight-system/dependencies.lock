@@ -1,16 +1,57 @@
 dependencies:
+  espressif/cmake_utilities:
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.5.3
+  espressif/i2c_bus:
+    component_hash: e3dddc78baa172f4768f3973fbecbd6c6c1f2cb23cc6a36cf3132758be092482
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.4.0
+  espressif/ssd1306:
+    component_hash: 102cfc05b1b304862fa3f494e9dd955844bcc5f6cb16596e4ca5df3e6bf9fd0d
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.5~1
   idf:
     source:
       type: idf
-    version: 5.4.0
-  protocol_examples_common:
-    dependencies: []
+    version: 5.2.5
+  truita/mpu9250:
+    component_hash: 3403bfddacef335397281d3191845d4e09c792e5fe62aff8689bcc67a388c645
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
     source:
-      path: /home/hayden/esp/v5.4/esp-idf/examples/common_components/protocol_examples_common
-      type: local
-    version: '*'
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.1
 direct_dependencies:
-- protocol_examples_common
-manifest_hash: 9a9520c926aa0a3e6ab6efa4fb14c3591e654d3887543776c1f730f359b02661
+- espressif/i2c_bus
+- espressif/ssd1306
+- idf
+- truita/mpu9250
+manifest_hash: 8efaaa86c5652ba4e215390ab54da4a94e0d8ffdc0c65d00023984dc10cef381
 target: esp32s3
 version: 2.0.0
