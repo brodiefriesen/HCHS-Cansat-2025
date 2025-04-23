@@ -10,5 +10,11 @@
     "idf.flashType": "UART",
     "idf.customExtraVars": {
         "IDF_TARGET": "esp32s3"
+    },
+    "files.associations": {
+        "esp_system.h": "c",
+        "mpu9250.h": "c",
+        "i2c.h": "c",
+        "task.h": "c"
     }
 }
