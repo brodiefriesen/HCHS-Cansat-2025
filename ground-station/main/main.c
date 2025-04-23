@@ -17,6 +17,9 @@ static const char *TAG = "main";
 static uint8_t msg_queue_len = 10;
 QueueHandle_t incoming;
 QueueHandle_t outgoing;
+TaskHandle_t tx_task_handle = NULL;  // Declare the task handle globally
+
+
 
 // This task gets the network up and running (see wifi.c for more info)
 void start_network_task(void *pvParameters) {
@@ -34,10 +37,10 @@ void webserver_task(void *pvParameters) {
 
 // LoRa Transmit Task - Send messages from the outgoing queue
 void tx_task(void *pvParameters) {
-    char out[100];
+    char out[200];
 
     while (1) {
-        // Wait indefinitely for data in the outgoing queue
+        // Wait indefinitely for data in the outgoing queue or a task notification
         if (xQueueReceive(outgoing, (void *)&out, portMAX_DELAY) == pdTRUE) {
             int txLen = strlen(out) + 1; // Ensure correct length
             ESP_LOGI(pcTaskGetName(NULL), "Sending %d-byte packet: %s", txLen, out);
@@ -46,12 +49,16 @@ void tx_task(void *pvParameters) {
                 ESP_LOGE(pcTaskGetName(NULL), "LoRaSend failed!");
             }
         }
+
+        // Block waiting for further messages or a notification
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     }
 }
 
+
 // LoRa Receive Task - Receive messages and put them in the incoming queue
 void rx_task(void *pvParameters) {
-    char in[100];
+    char in[200];
 
     while (1) {
         uint8_t rxLen = LoRaReceive((uint8_t *)in, sizeof(in));
@@ -97,8 +104,8 @@ void app_main(void)
 
     LoRaConfig(spreadingFactor, bandwidth, codingRate, preambleLength, payloadLen, crcOn, invertIrq);
 
-    outgoing = xQueueCreate(msg_queue_len, sizeof(char[100]));
-    incoming = xQueueCreate(msg_queue_len, sizeof(char[100]));
+    outgoing = xQueueCreate(msg_queue_len, sizeof(char[200]));
+    incoming = xQueueCreate(msg_queue_len, sizeof(char[200]));
 
     // I don't know what all this does, and I am too fearful to touch it
     ESP_LOGI(TAG, "NVS init");
@@ -107,10 +114,11 @@ void app_main(void)
     ESP_LOGI(TAG, "Eventloop create");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+
     // Create tasks with TX task having a higher priority
     xTaskCreate(start_network_task, "start network task", 5000, NULL, 10, NULL);
     xTaskCreate(webserver_task, "webserver task", 10000, NULL, 10, NULL);
-    xTaskCreate(tx_task, "tx task", 5000, NULL, 20, NULL); // Higher priority for TX
+    xTaskCreate(tx_task, "tx task", 5000, NULL, 20, &tx_task_handle); // Higher priority for TX
     xTaskCreate(rx_task, "rx task", 5000, NULL, 10, NULL); // RX has lower priority
 
     // Allow time for tasks to be created and scheduled(this shouldnt be required, app_main should not end until all tasks have been terminated)
