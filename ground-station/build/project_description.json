@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "ground-station",
-    "project_version":    "1575205-dirty",
+    "project_version":    "5f97824-dirty",
     "project_path":       "/home/brodie/esp/HCHS-Cansat-2025/ground-station",
     "idf_path":           "/home/brodie/esp/v5.4/esp-idf",
     "build_dir":          "/home/brodie/esp/HCHS-Cansat-2025/ground-station/build",

@@ -17,6 +17,10 @@ static const char *TAG = "http";
 // Global queues for incoming/outgoing messages
 static QueueHandle_t *outgoing;
 static QueueHandle_t *incoming;
+// http.c
+extern TaskHandle_t tx_task_handle;  // Declare it as extern here
+
+
 
 // Buffer to store the latest received LoRa message
 static char latest_message[100] = "No data received";
@@ -62,7 +66,6 @@ static esp_err_t sse_handler(httpd_req_t *req)
 
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
-    vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 static const httpd_uri_t sse = {
@@ -100,27 +103,32 @@ static esp_err_t instruction_post_handler(httpd_req_t *req)
         }
 
         buf[ret] = '\0'; // Null-terminate received data
-        // snprintf(latest_message, sizeof(latest_message), "%s", buf); // Store latest message
-
         ESP_LOGI(TAG, "Received instruction: %s", buf);
 
-// Ensure null termination (safety check)
-buf[99] = '\0';
+        // Prepare a safe copy
+        char temp[200];
+        strncpy(temp, buf, sizeof(temp));
+        temp[sizeof(temp) - 1] = '\0'; // Ensure null-termination
 
-if (xQueueSend(*outgoing, (void *)buf, pdMS_TO_TICKS(10)) != pdTRUE) {
-    ESP_LOGE(TAG, "Outgoing queue full! Dropping message.");
-} else {
-    ESP_LOGI(TAG, "Message added to outgoing queue.");
-}
+        // Queue the message for later transmission
+        if (xQueueSend(*outgoing, (void *)temp, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGE(TAG, "Outgoing queue full! Dropping message.");
+        } else {
+            ESP_LOGI(TAG, "Message added to outgoing queue.");
 
+            // Wake up tx_task to immediately process the queue
+            xTaskNotifyGive(tx_task_handle); // tx_task_handle is the task handle for tx_task
+        }
 
-        ESP_LOGI(TAG, "Received Data: %s", buf);
         remaining -= ret;
     }
 
     httpd_resp_send(req, "ACK", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
+
+
+
 
 static const httpd_uri_t instruction = {
     .uri       = "/instruction",
