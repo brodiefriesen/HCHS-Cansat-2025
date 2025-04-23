@@ -113,8 +113,6 @@ void app_main(void)
     xTaskCreate(tx_task, "tx task", 5000, NULL, 20, NULL); // Higher priority for TX
     xTaskCreate(rx_task, "rx task", 5000, NULL, 10, NULL); // RX has lower priority
 
-    // Allow time for tasks to be created and scheduled
-vTaskDelay(pdMS_TO_TICKS(1000));  // Wait for 1 second
-
-
+    // Allow time for tasks to be created and scheduled(this shouldnt be required, app_main should not end until all tasks have been terminated)
+    // vTaskDelay(pdMS_TO_TICKS(1000));  
 }

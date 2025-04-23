@@ -1,1 +1,0 @@
-cargo +nightly build --target riscv64gc-unknown-linux-musl -Zbuild-std=core,std 
