@@ -17,9 +17,10 @@ static const char *TAG = "http";
 // Global queues for incoming/outgoing messages
 static QueueHandle_t *outgoing;
 static QueueHandle_t *incoming;
+static QueueHandle_t *image_out;
 
 // Buffer to store the latest received LoRa message
-static char latest_message[100] = "No data received";
+static char latest_message[400] = "No data received";
 
 // ------------------------- STATUS ENDPOINT -------------------------
 static esp_err_t status_get_handler(httpd_req_t *req)
@@ -44,13 +45,12 @@ static esp_err_t sse_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
-    char in[100];
+    char in[400];
 
     while (1) {
         if (xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
             snprintf(latest_message, sizeof(latest_message), "%s", in); // Store latest message
-
-            char sse_data[120];
+            char sse_data[420];
             int len = snprintf(sse_data, sizeof(sse_data), "data: %s\n\n", in);
             if (httpd_resp_send_chunk(req, sse_data, len) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to send SSE data");
@@ -67,6 +67,40 @@ static esp_err_t sse_handler(httpd_req_t *req)
 
 static const httpd_uri_t sse = {
     .uri       = "/sse",
+    .method    = HTTP_GET,
+    .handler   = sse_handler,
+    .user_ctx  = NULL
+};
+
+// ------------------------- SSE2 ENDPOINT -------------------------
+static esp_err_t sse2_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/event-stream");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Connection", "keep-alive");
+
+    char in[110];
+
+    while (1) {
+        if (xQueueReceive(*image_out, (void *)&in, 0) == pdTRUE) {
+            snprintf(latest_message, sizeof(latest_message), "%s", in); // Store latest message
+            char sse_data[130];
+            int len = snprintf(sse_data, sizeof(sse_data), "data: %s\n\n", in);
+            if (httpd_resp_send_chunk(req, sse_data, len) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to send SSE data");
+                break;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(500)); // Send data every 500ms
+    }
+
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+    vTaskDelay(pdMS_TO_TICKS(50));
+}
+
+static const httpd_uri_t sse2 = {
+    .uri       = "/sse2",
     .method    = HTTP_GET,
     .handler   = sse_handler,
     .user_ctx  = NULL
@@ -130,19 +164,21 @@ static const httpd_uri_t instruction = {
 };
 
 // ------------------------- WEB SERVER START/STOP -------------------------
-httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in)
+httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in, QueueHandle_t *image)
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
     outgoing = out;
     incoming = in;
+    image_out = image;
 
     ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &status);
         httpd_register_uri_handler(server, &sse);
+        httpd_register_uri_handler(server, &sse2);
         httpd_register_uri_handler(server, &latest);
         httpd_register_uri_handler(server, &instruction);
         return server;

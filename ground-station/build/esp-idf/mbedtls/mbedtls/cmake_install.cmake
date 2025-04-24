@@ -1,4 +1,4 @@
-# Install script for directory: /home/brodie/esp/v5.4/esp-idf/components/mbedtls/mbedtls
+# Install script for directory: /home/hayden/esp/v5.2.5/esp-idf/components/mbedtls/mbedtls
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -34,15 +34,15 @@ endif()
 
 # Set default install directory permissions.
 if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/home/brodie/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump")
+  set(CMAKE_OBJDUMP "/home/hayden/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/brodie/esp/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
-  include("/home/brodie/esp/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
-  include("/home/brodie/esp/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
-  include("/home/brodie/esp/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/pkgconfig/cmake_install.cmake")
+  include("/home/hayden/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
+  include("/home/hayden/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
+  include("/home/hayden/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
+  include("/home/hayden/HCHS-Cansat-2025/ground-station/build/esp-idf/mbedtls/mbedtls/pkgconfig/cmake_install.cmake")
 
 endif()
 

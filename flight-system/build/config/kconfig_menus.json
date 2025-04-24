@@ -29832,10 +29832,7 @@
                                         "help": "Set the maximum number of software I2C ports that can be used. This option is only applicable when\nsoftware I2C support is enabled.",
                                         "id": "I2C_BUS_SOFTWARE_MAX_PORT",
                                         "name": "I2C_BUS_SOFTWARE_MAX_PORT",
-                                        "range": [
-                                            1,
-                                            5
-                                        ],
+                                        "range": null,
                                         "title": "Maximum number of software I2C ports",
                                         "type": "int"
                                     }

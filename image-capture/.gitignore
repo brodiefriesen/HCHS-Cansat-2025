@@ -1,7 +1,6 @@
 /host-tools
 host-tools
-Makefile
-CMakeCache.txt
+build/
 
 *.o
 

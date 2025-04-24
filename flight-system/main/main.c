@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ra01s.h"
+#include "minmea.h"
 
 #undef LOW
 #undef HIGH
@@ -18,6 +19,9 @@
 #include "VL53L1X_api.h"
 #include "i2c_platform_esp.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
+#include "nmea.h"
+#include "gprmc.h"
 
 static mpu9250_t imu;
 
@@ -26,17 +30,23 @@ static mpu9250_t imu;
 #define P_I2C_SCL           19
 #define MPU9250_ADDRESS     0x68
 #define TOF_I2C_ADDR        (0x29 << 1)
-#define PARACHUTE_PIN       GPIO_NUM_46
+#define PARACHUTE_PIN       GPIO_NUM_3
 #define ACCEL_THRESHOLD     1.2f
+//GPS stuff
+#define TIME_ZONE (-6)
+#define YEAR_BASE (2000)
 
 static const char *TAG = "main";
 
 SemaphoreHandle_t loraMutex;
 TaskHandle_t rx_task_handle;
+SemaphoreHandle_t queueMutex;
 
 int mpu_enabled = 1;
 int bmp_enabled = 1;
 static bool parachute_deployed = false;
+const uart_port_t image_uart_num = UART_NUM_2;
+char send_queue[50];
 
 typedef enum {
     STATE_GROUND = 0,
@@ -47,10 +57,17 @@ typedef enum {
     STATE_LANDED
 } flight_state_t;
 
+enum image_state{
+    TRANSMIT,
+    SAVE,
+    NONE
+}
+
 static flight_state_t flight_state = STATE_GROUND;
 static float ground_altitude = -1;
 static float last_altitude = 0;
 static bool last_tof_valid = true;
+static enum image_state = NONE;
 
 static void deployParachute() {
     gpio_set_level(PARACHUTE_PIN, 0);
@@ -103,9 +120,8 @@ static void updateFlightState(float altitude, bool tof_valid, float tof_dist, fl
 }
 
 void getReport(char* out) {
-    char rep[400];
+    char rep[300];
     uint64_t ts = esp_timer_get_time() / 1000;
-    snprintf(rep, sizeof(rep), "DWL:1:%llu:", ts);
 
     // Read MPU and convert to Gs
     float ax=0, ay=0, az=0;
@@ -150,26 +166,82 @@ void getReport(char* out) {
 
 
     // build report
-    char buf[200];
-    snprintf(buf, sizeof(buf),
-        "ACC:%.2f,%.2f,%.2f:GY:%.2f,%.2f,%.2f:PITCH:%.2f:YAW:%.2f:ALT:%.2f:TOF:%.2f:STATE:%d:CHUTE:%d:",
-        ax,ay,az, gx,gy,gz, pitch,yaw, altitude, tof_m, flight_state, parachute_deployed);
-    strncat(rep, buf, sizeof(rep)-strlen(rep)-1);
-    strncat(rep, "EOT", sizeof(rep)-strlen(rep)-1);
+    char buf[280];
+    if (xSemaphoreTake(queueMutex, portMAX_DELAY)==pdTRUE) {
+        snprintf(buf, sizeof(buf),
+            "DWL:{%d}ACC:%.2f,%.2f,%.2f:GY:%.2f,%.2f,%.2f:PITCH:%.2f:YAW:%.2f:ALT:%.2f:TOF:%.2f:STATE:%d:CHUTE:%d:DUO:%s:",
+            ts, ax,ay,az, gx,gy,gz, pitch,yaw, altitude, tof_m, flight_state, parachute_deployed, send_queue);
+        xSemaphoreGive(queueMutex);
+    }
+    snprintf(rep, sizeof(rep), buf);
+    strcat(rep, "EOT");
     strcpy(out, rep);
 }
 
 void transmit_loop_task(void*pv) {
     while(1) {
-        char report[400];
+        char report[300];
         getReport(report);
         ESP_LOGI(TAG, "%s", report);
         if (xSemaphoreTake(loraMutex, portMAX_DELAY)==pdTRUE) {
-            LoRaSend((uint8_t*)report, strlen(report), SX126x_TXMODE_SYNC);
+            LoRaSend((const char*)report, strlen(report), SX126x_TXMODE_SYNC);
             xSemaphoreGive(loraMutex);
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+void tx_image(uint8_t buf[100]){
+    char new_buf[107];
+    snprintf(new_buf, sizeof(new_buf), "IMG:%s:", (char *) buf);
+    if (xSemaphoreTake(loraMutex, portMAX_DELAY)==pdTRUE) {
+            LoRaSend((uint8_t*)new_buf, sizeof(new_buf), SX126x_TXMODE_SYNC);
+            xSemaphoreGive(loraMutex);
+    }
+}
+
+void duo_comm_task(void*pv){
+    switch image_state{
+        case SAVE:
+            uart_write_bytes(image_uart_num, (const char*) "is", strlen(n));
+            break;
+        case TRANSMIT:
+            uart_write_bytes(image_uart_num, (const char*) "it", strlen(t));
+            break;
+        case NONE:
+            break;
+    }
+    char buf[1024];
+    char final[1024];
+    int length = 0;
+    int packet_len = 0;
+    ESP_ERROR_CHECK(uart_get_buffered_data_len(image_uart_num, (size_t*)&length));
+    if(length > 0){
+        uart_read_bytes(image_uart_num, buf, length, 100);
+        if(buf[0] == 'I'){
+            while(length>0){
+                tx_image(buf);
+                ESP_ERROR_CHECK(uart_get_buffered_data_len(image_uart_num, (size_t*)&length));
+            }
+            
+        }else if(buf[0] == 'G'){
+            snprintf(buf, length, final);
+            packet_len += length;
+            ESP_ERROR_CHECK(uart_get_buffered_data_len(image_uart_num, (size_t*)&length));
+            while(length>0){
+                snprintf(buf, length, final);
+                packet_len += length;
+                ESP_ERROR_CHECK(uart_get_buffered_data_len(image_uart_num, (size_t*)&length));
+            }
+            if (xSemaphoreTake(queueMutex, portMAX_DELAY)==pdTRUE) {
+                snprintf(send_queue, packet_len, final);
+                xSemaphoreGive(queueMutex);
+            }
+        }
+        ESP_ERROR_CHECK(uart_get_buffered_data_len(image_uart_num, (size_t*)&length));
+    }
+    transmit_image = false;
+    vTaskDelete(NULL);
 }
 
 void rx_task(void*pv) {
@@ -187,13 +259,19 @@ void rx_task(void*pv) {
                         flight_state = (flight_state_t)s;
                         ESP_LOGI(TAG, "State overridden to %d via CMD", s);
                     }
+                }else if (strncmp(buf, "CMD:IMAGE:",10)==0) {
+                    image_state = SAVE;
+                }else if (strncmp(buf, "CMD:TIMAGE:",11)==0) {
+                    image_state = TRANSMIT;
                 }
+            
             }
             xSemaphoreGive(loraMutex);
         }
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
+
 
 void app_main() {
     esp_log_level_set("RA01S", ESP_LOG_DEBUG);
@@ -203,6 +281,7 @@ void app_main() {
     }
     LoRaConfig(7,4,1,8,0,true,false);
     loraMutex = xSemaphoreCreateMutex();
+    queueMutex = xSemaphoreCreateMutex();
 
     nvs_flash_init(); esp_netif_init(); esp_event_loop_create_default();
 
@@ -255,6 +334,20 @@ if (bmp180_read_temperature(&t) == ESP_OK && bmp180_read_pressure(&p) == ESP_OK)
         }
     }
 
+    uart_config_t image_uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
+        .rx_flow_ctrl_thresh = 122,
+    };
+    // Configure image UART parameters
+    ESP_ERROR_CHECK(uart_driver_install(image_uart_num, 1024, 1024, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(image_uart_num, &image_uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(image_uart_num, 48, 47, -1, -1)); //image tx: 48, rx: 47
+
     xTaskCreate(rx_task,"rx",4096,NULL,3,&rx_task_handle);
     xTaskCreate(transmit_loop_task,"tx",4096,NULL,4,NULL);
+    xTaskCreate(duo_comm_task, "duo comm",4096,NULL,3,NULL);
 }

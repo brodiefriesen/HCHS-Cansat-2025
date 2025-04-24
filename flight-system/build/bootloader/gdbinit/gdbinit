@@ -1,2 +1,2 @@
-source /home/brodie/esp/HCHS-Cansat-2025/flight-system/build/bootloader/gdbinit/symbols
-source /home/brodie/esp/HCHS-Cansat-2025/flight-system/build/bootloader/gdbinit/connect
+source /home/hayden/HCHS-Cansat-2025/flight-system/build/bootloader/gdbinit/symbols
+source /home/hayden/HCHS-Cansat-2025/flight-system/build/bootloader/gdbinit/connect

@@ -1,4 +1,4 @@
-/* * Data converted from /home/brodie/esp/HCHS-Cansat-2025/flight-system/main/certs/prvtkey.pem
+/* * Data converted from /home/hayden/HCHS-Cansat-2025/flight-system/main/certs/prvtkey.pem
  * (null byte appended)
  */
 .data

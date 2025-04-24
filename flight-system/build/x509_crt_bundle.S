@@ -1,4 +1,4 @@
-/* * Data converted from /home/brodie/esp/HCHS-Cansat-2025/flight-system/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from /home/hayden/HCHS-Cansat-2025/flight-system/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

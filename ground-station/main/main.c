@@ -17,6 +17,8 @@ static const char *TAG = "main";
 static uint8_t msg_queue_len = 10;
 QueueHandle_t incoming;
 QueueHandle_t outgoing;
+static uint8_t image_queue_len = 100;
+QueueHandle_t image_out;
 
 // This task gets the network up and running (see wifi.c for more info)
 void start_network_task(void *pvParameters) {
@@ -28,7 +30,7 @@ void start_network_task(void *pvParameters) {
 // This task gets the HTTP server going (see http.c for more info)
 void webserver_task(void *pvParameters) {
     httpd_handle_t server = NULL;
-    server = start_webserver(&outgoing, &incoming);
+    server = start_webserver(&outgoing, &incoming, &image_out);
     vTaskDelete(NULL);
 }
 
@@ -51,13 +53,17 @@ void tx_task(void *pvParameters) {
 
 // LoRa Receive Task - Receive messages and put them in the incoming queue
 void rx_task(void *pvParameters) {
-    char in[100];
+    char in[110];
 
     while (1) {
         uint8_t rxLen = LoRaReceive((uint8_t *)in, sizeof(in));
 
         if (rxLen > 0) {
-            if (xQueueSend(incoming, (void *)in, pdMS_TO_TICKS(10)) != pdTRUE) {
+            if(in[0] == 'I'){
+                if(xQueueSend(image_out, (void *)in, pdMS_TO_TICKS(10)) != pdTRUE) {
+                    ESP_LOGI(TAG, "Incoming queue full!");
+                }
+            }else if (xQueueSend(incoming, (void *)in, pdMS_TO_TICKS(10)) != pdTRUE) {
                 ESP_LOGI(TAG, "Incoming queue full!");
             } else {
                 ESP_LOGI(pcTaskGetName(NULL), "Received: %s", in);
@@ -74,8 +80,8 @@ void app_main(void)
     LoRaInit();
 
     int8_t txPowerInDbm = 22;
-    uint32_t frequencyInHz = 915000000;
-    ESP_LOGI(TAG, "Frequency is 915MHz");
+    uint32_t frequencyInHz = 909000000;
+    ESP_LOGI(TAG, "Frequency is 909MHz");
 
     float tcxoVoltage = 3.3;
     bool useRegulatorLDO = true;
@@ -98,7 +104,8 @@ void app_main(void)
     LoRaConfig(spreadingFactor, bandwidth, codingRate, preambleLength, payloadLen, crcOn, invertIrq);
 
     outgoing = xQueueCreate(msg_queue_len, sizeof(char[100]));
-    incoming = xQueueCreate(msg_queue_len, sizeof(char[100]));
+    incoming = xQueueCreate(msg_queue_len, sizeof(char[400]));
+    image_out = xQueueCreate(msg_queue_len, sizeof(char[110]));
 
     // I don't know what all this does, and I am too fearful to touch it
     ESP_LOGI(TAG, "NVS init");

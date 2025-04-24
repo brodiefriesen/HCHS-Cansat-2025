@@ -1,10 +1,8 @@
-/* * Data converted from /home/brodie/esp/HCHS-Cansat-2025/ground-station/main/certs/prvtkey.pem
+/* * Data converted from /home/hayden/HCHS-Cansat-2025/ground-station/main/certs/prvtkey.pem
  * (null byte appended)
  */
 .data
-#if !defined (__APPLE__) && !defined (__linux__)
 .section .rodata.embedded
-#endif
 
 .global prvtkey_pem
 prvtkey_pem:
@@ -125,4 +123,4 @@ _binary_prvtkey_pem_end: /* for objcopy compatibility */
 
 .global prvtkey_pem_length
 prvtkey_pem_length: /* not including null byte */
-.long 1704
+.word 1704

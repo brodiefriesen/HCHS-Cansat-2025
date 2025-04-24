@@ -1,10 +1,8 @@
-/* * Data converted from /home/brodie/esp/HCHS-Cansat-2025/ground-station/main/certs/servercert.pem
+/* * Data converted from /home/hayden/HCHS-Cansat-2025/ground-station/main/certs/servercert.pem
  * (null byte appended)
  */
 .data
-#if !defined (__APPLE__) && !defined (__linux__)
 .section .rodata.embedded
-#endif
 
 .global servercert_pem
 servercert_pem:
@@ -91,4 +89,4 @@ _binary_servercert_pem_end: /* for objcopy compatibility */
 
 .global servercert_pem_length
 servercert_pem_length: /* not including null byte */
-.long 1159
+.word 1159

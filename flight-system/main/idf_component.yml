@@ -17,3 +17,4 @@ dependencies:
   truita/mpu9250: ^1.0.1
   espressif/i2c_bus: ^1.4.0
   espressif/ssd1306: ^1.0.5~1
+  igrr/libnmea: '*'

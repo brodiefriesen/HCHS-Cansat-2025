@@ -1,0 +1,3 @@
+/home/hayden/HCHS-Cansat-2025/image-capture/CMakeFiles/image-capture.dir
+/home/hayden/HCHS-Cansat-2025/image-capture/CMakeFiles/edit_cache.dir
+/home/hayden/HCHS-Cansat-2025/image-capture/CMakeFiles/rebuild_cache.dir
