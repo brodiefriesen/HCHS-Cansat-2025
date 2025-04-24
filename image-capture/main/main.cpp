@@ -14,6 +14,17 @@
 // DuoS:    milkv_duos
 #define WIRINGX_TARGET "milkv_duo256m"
 
+int parse_comma_delimited_str(char *string, char **fields, int max_fields)
+{
+   int i = 0;
+   fields[i++] = string;
+   while ((i < max_fields) && NULL != (string = strchr(string, ','))) {
+      *string = '\0';
+      fields[i++] = ++string;
+   }
+   return --i;
+}
+
 //stolen file size function
 int fsize(FILE *fp){
     int prev=ftell(fp);
@@ -23,7 +34,35 @@ int fsize(FILE *fp){
     return sz;
 }
 
-int waitOnUart(struct wiringXSerial_t wiringXSerial){
+int getGPS(struct wiringXSerial_t gpsUart){
+    int fd;
+
+    if ((fd = wiringXSerialOpen("/dev/ttyS1", gpsUart)) < 0) {
+        fprintf(stderr, "Open serial device failed: 1\n");
+        wiringXGC();
+        return -1;
+    }
+
+    char buf[256];
+    char **out;
+    int i;
+    int recv_len = 0;
+    recv_len = wiringXSerialDataAvail(fd);
+
+    if (recv_len > 0) {
+        i = 0;
+        while (recv_len--)
+        {
+            buf[i++] = wiringXSerialGetChar(fd);
+        }
+        parse_comma_delimited_str(buf, out, 8);
+
+        wiringXSerialPrintf(fd, "G:{LAT:{%s%c}:LON{%s%c}:}:", out[2], out[3], out[4], out[5]);
+    }
+
+}
+
+int waitOnUart(struct wiringXSerial_t espUart){
     char buf[1024];
 
     int recv_len = 0;
@@ -31,46 +70,43 @@ int waitOnUart(struct wiringXSerial_t wiringXSerial){
     int fd;
 
     //open serial connection
-    if ((fd = wiringXSerialOpen("/dev/ttyS1", wiringXSerial)) < 0) {
-        fprintf(stderr, "Open serial device failed: %d\n", fd);
+    if ((fd = wiringXSerialOpen("/dev/ttyS2", espUart)) < 0) {
+        fprintf(stderr, "Open serial device failed: 2\n");
         wiringXGC();
         return -1;
     }
     wiringXSerialFlush(fd);
 
     //hang until data is recieved
-    while(recv_len == 0){
-        recv_len = wiringXSerialDataAvail(fd);
-        if (recv_len > 0) {
-            fprintf(stderr, "recieved!\n");
-            i = 0;
-            while (recv_len--)
-            {
-                buf[i++] = wiringXSerialGetChar(fd);
-            }
-            if (recv_len > 1){
-                case buf[0]{
-                    case 't': //transmit image instruction
-                        wiringXSerialPuts(fd, "ACK");
-                        return 1;
-                    case 's': //shutdown program instruction
-                        wiringXSerialPuts(fd, "ACK");
-                        return 2;
-                    default: //unrecognized instruction
-                        wiringXSerialPuts(fd, "?");
-                        return 0;
-                }
+    recv_len = wiringXSerialDataAvail(fd);
+    if (recv_len > 0) {
+        fprintf(stderr, "recieved!\n");
+        i = 0;
+        while (recv_len--)
+        {
+            buf[i++] = wiringXSerialGetChar(fd);
+        }
+        if (recv_len > 1){
+            if(buf[0] == 't'){
+                //transmit image instruction
+                return 2;
+            } else if(buf[0] == 's'){
+                //shutdown program instruction
+                wiringXSerialPuts(fd, "ACK");
+                return 3;
+            } else{
+                //unrecognized instruction
+                wiringXSerialPuts(fd, "?");
+                return 1;
             }
         }
     }
 
-    //case for when esp32 wants us to save image
-    wiringXSerialPuts(fd, "ACK");
     wiringXSerialClose(fd);
     return 0;
 }
 
-int transmit(char* filename, struct wiringXSerial_t wiringXSerial){
+int transmit(char* filename, struct wiringXSerial_t espUart){
     FILE* fp;
     fp = fopen(filename, "rb");
 
@@ -82,14 +118,11 @@ int transmit(char* filename, struct wiringXSerial_t wiringXSerial){
     int i;
     
     //open serial connection
-    if ((fd = wiringXSerialOpen("/dev/ttyS1", wiringXSerial)) < 0) {
-        fprintf(stderr, "Open serial device failed: %d\n", fd);
+    if ((fd = wiringXSerialOpen("/dev/ttyS2", espUart)) < 0) {
+        fprintf(stderr, "Open serial device failed: 2");
         wiringXGC();
         return -1;
     }
-
-    //warn recipient of incoming transmission
-    wiringXSerialPuts(fd, "T");
 
     fprintf(stderr, "filesize: %d\n", file_size);
 
@@ -109,7 +142,8 @@ int main(){
         return -1;
     }
     //define wiringx serial parameters
-    struct wiringXSerial_t wiringXSerial = {115200, 8, 'n', 1, 'n'};
+    struct wiringXSerial_t espUart = {115200, 8, 'n', 1, 'n'};
+    struct wiringXSerial_t gpsUart = {9600, 8, 'n', 1, 'n'};
 
     //set up cv image capture parameters and open
     cv::VideoCapture cap;
@@ -131,32 +165,32 @@ int main(){
 
     //main loop
     while(running){
-        switch(waitOnUart(wiringXSerial)) {
-            case 0: //save image
+        getGPS(gpsUart);
+        switch(waitOnUart(espUart)) {
+            case 1: //save image
                 fprintf(stderr, "save requested\n");
                 sprintf(filename, "/root/images/out%d.jpg", i);
                 cap >> image;
                 cv::imwrite(filename, image);
                 fprintf(stderr, "done %d\n",  i);
                 break;
-            case 1: //save and transmit image
+            case 2: //save and transmit image
                 fprintf(stderr, "transmit requested\n");
                 sprintf(filename, "/root/images/out%d.jpg", i);
                 cap >> image;
                 cv::imwrite(filename, image);
-                if(transmit(filename, wiringXSerial)!=0){
+                if(transmit(filename, espUart)!=0){
                     cap.release();
                     wiringXGC();
                     return -1;
                 }
                 fprintf(stderr, "done %d\n",  i);
                 break;
-            case 2:
+            case 3:
                 running = false;
-            default: //error state
-                cap.release();
-                wiringXGC();
-                return -1;
+                break;
+            default: 
+                break;
         }
         i++;
     }
