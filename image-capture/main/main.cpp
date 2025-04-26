@@ -14,17 +14,6 @@
 // DuoS:    milkv_duos
 #define WIRINGX_TARGET "milkv_duo256m"
 
-int parse_comma_delimited_str(char *string, char **fields, int max_fields)
-{
-   int i = 0;
-   fields[i++] = string;
-   while ((i < max_fields) && NULL != (string = strchr(string, ','))) {
-      *string = '\0';
-      fields[i++] = ++string;
-   }
-   return --i;
-}
-
 //stolen file size function
 int fsize(FILE *fp){
     int prev=ftell(fp);
@@ -32,34 +21,6 @@ int fsize(FILE *fp){
     int sz=ftell(fp);
     fseek(fp,prev,SEEK_SET); //go back to where we were
     return sz;
-}
-
-int getGPS(struct wiringXSerial_t gpsUart){
-    int fd;
-
-    if ((fd = wiringXSerialOpen("/dev/ttyS1", gpsUart)) < 0) {
-        fprintf(stderr, "Open serial device failed: 1\n");
-        wiringXGC();
-        return -1;
-    }
-
-    char buf[256];
-    char **out;
-    int i;
-    int recv_len = 0;
-    recv_len = wiringXSerialDataAvail(fd);
-
-    if (recv_len > 0) {
-        i = 0;
-        while (recv_len--)
-        {
-            buf[i++] = wiringXSerialGetChar(fd);
-        }
-        parse_comma_delimited_str(buf, out, 8);
-
-        wiringXSerialPrintf(fd, "G:{LAT:{%s%c}:LON{%s%c}:}:", out[2], out[3], out[4], out[5]);
-    }
-
 }
 
 int waitOnUart(struct wiringXSerial_t espUart){
@@ -70,12 +31,13 @@ int waitOnUart(struct wiringXSerial_t espUart){
     int fd;
 
     //open serial connection
-    if ((fd = wiringXSerialOpen("/dev/ttyS2", espUart)) < 0) {
-        fprintf(stderr, "Open serial device failed: 2\n");
+    if ((fd = wiringXSerialOpen("/dev/ttyS1", espUart)) < 0) {
+        fprintf(stderr, "Open serial device failed: 1\n");
         wiringXGC();
         return -1;
     }
-    wiringXSerialFlush(fd);
+
+    wiringXSerialPuts(fd, "balls");
 
     //hang until data is recieved
     recv_len = wiringXSerialDataAvail(fd);
@@ -92,11 +54,9 @@ int waitOnUart(struct wiringXSerial_t espUart){
                 return 2;
             } else if(buf[0] == 's'){
                 //shutdown program instruction
-                wiringXSerialPuts(fd, "ACK");
                 return 3;
             } else{
-                //unrecognized instruction
-                wiringXSerialPuts(fd, "?");
+                //just save
                 return 1;
             }
         }
@@ -118,8 +78,8 @@ int transmit(char* filename, struct wiringXSerial_t espUart){
     int i;
     
     //open serial connection
-    if ((fd = wiringXSerialOpen("/dev/ttyS2", espUart)) < 0) {
-        fprintf(stderr, "Open serial device failed: 2");
+    if ((fd = wiringXSerialOpen("/dev/ttyS1", espUart)) < 0) {
+        fprintf(stderr, "Open serial device failed: 1");
         wiringXGC();
         return -1;
     }
@@ -127,6 +87,7 @@ int transmit(char* filename, struct wiringXSerial_t espUart){
     fprintf(stderr, "filesize: %d\n", file_size);
 
     //copy image to serial buffer
+    wiringXSerialPrintf(fd, "I");
     fread(buf, 1, file_size, fp);
     write(fd, buf, file_size);
 
@@ -137,18 +98,17 @@ int transmit(char* filename, struct wiringXSerial_t espUart){
 
 int main(){
     //setup wiringx
-    if(wiringXSetup(WIRINGX_TARGET, NULL) == -1) {
+    int DUO_GPIO = 0;
+    if(wiringXSetup((char*) WIRINGX_TARGET, NULL) == -1) { //char pointer cast so compiler doesnt give us annoying warnings :(
         wiringXGC();
         return -1;
     }
     //define wiringx serial parameters
-    struct wiringXSerial_t espUart = {115200, 8, 'n', 1, 'n'};
-    struct wiringXSerial_t gpsUart = {9600, 8, 'n', 1, 'n'};
-
+    //struct wiringXSerial_t espUart = {115200, 8, 'n', 1, 'n'};
     //set up cv image capture parameters and open
     cv::VideoCapture cap;
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 320);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 240);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
     cap.open(0);
 
     //define intermediary image matrix
@@ -163,36 +123,35 @@ int main(){
     bool running = true;
     int i = 0; //image number
 
+    pinMode(DUO_GPIO, PINMODE_INPUT);
+
     //main loop
     while(running){
-        getGPS(gpsUart);
-        switch(waitOnUart(espUart)) {
-            case 1: //save image
-                fprintf(stderr, "save requested\n");
-                sprintf(filename, "/root/images/out%d.jpg", i);
-                cap >> image;
-                cv::imwrite(filename, image);
-                fprintf(stderr, "done %d\n",  i);
-                break;
-            case 2: //save and transmit image
+        int in = digitalRead(DUO_GPIO);
+        if(in==0){
+            sprintf(filename, "/root/images/out%d.jpg", i);
+            cap >> image;
+            cv::imwrite(filename, image);
+            fprintf(stderr, "done %d\n",  i);
+            /*
+            int ret = waitOnUart(espUart);
+            if(ret==2){
                 fprintf(stderr, "transmit requested\n");
-                sprintf(filename, "/root/images/out%d.jpg", i);
-                cap >> image;
-                cv::imwrite(filename, image);
+                
                 if(transmit(filename, espUart)!=0){
                     cap.release();
                     wiringXGC();
                     return -1;
                 }
-                fprintf(stderr, "done %d\n",  i);
-                break;
-            case 3:
+
+            }else if(ret==3){
                 running = false;
-                break;
-            default: 
-                break;
+            }
+            */
+
+            sleep(5);
+            i++;
         }
-        i++;
     }
 
     //wrap up

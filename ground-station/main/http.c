@@ -19,8 +19,10 @@ static QueueHandle_t *outgoing;
 static QueueHandle_t *incoming;
 static QueueHandle_t *image_out;
 
+static TaskHandle_t *tx_task_handle;
+
 // Buffer to store the latest received LoRa message
-static char latest_message[400] = "No data received";
+static char latest_message[200] = "No data received";
 
 // ------------------------- STATUS ENDPOINT -------------------------
 static esp_err_t status_get_handler(httpd_req_t *req)
@@ -45,12 +47,12 @@ static esp_err_t sse_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
-    char in[400];
+    char in[140];
 
     while (1) {
         if (xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
             snprintf(latest_message, sizeof(latest_message), "%s", in); // Store latest message
-            char sse_data[420];
+            char sse_data[220];
             int len = snprintf(sse_data, sizeof(sse_data), "data: %s\n\n", in);
             if (httpd_resp_send_chunk(req, sse_data, len) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to send SSE data");
@@ -147,7 +149,7 @@ static esp_err_t instruction_post_handler(httpd_req_t *req)
             ESP_LOGI(TAG, "Message added to outgoing queue.");
 
             // Wake up tx_task to immediately process the queue
-            xTaskNotifyGive(tx_task_handle); // tx_task_handle is the task handle for tx_task
+            xTaskNotifyGive(*tx_task_handle); // tx_task_handle is the task handle for tx_task
         }
 
         remaining -= ret;
@@ -168,7 +170,7 @@ static const httpd_uri_t instruction = {
 };
 
 // ------------------------- WEB SERVER START/STOP -------------------------
-httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in, QueueHandle_t *image)
+httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in, QueueHandle_t *image, TaskHandle_t *tx_task)
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -176,6 +178,7 @@ httpd_handle_t start_webserver(QueueHandle_t *out, QueueHandle_t *in, QueueHandl
     outgoing = out;
     incoming = in;
     image_out = image;
+    tx_task_handle=tx_task;
 
     ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {

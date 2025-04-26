@@ -31,7 +31,7 @@ void start_network_task(void *pvParameters) {
 // This task gets the HTTP server going (see http.c for more info)
 void webserver_task(void *pvParameters) {
     httpd_handle_t server = NULL;
-    server = start_webserver(&outgoing, &incoming, &image_out);
+    server = start_webserver(&outgoing, &incoming, &image_out, &tx_task_handle);
     vTaskDelete(NULL);
 }
 
@@ -58,7 +58,8 @@ void tx_task(void *pvParameters) {
 
 // LoRa Receive Task - Receive messages and put them in the incoming queue
 void rx_task(void *pvParameters) {
-    char in[110];
+    char in[140];
+    char dummy[160];
 
     while (1) {
         uint8_t rxLen = LoRaReceive((uint8_t *)in, sizeof(in));
@@ -66,10 +67,16 @@ void rx_task(void *pvParameters) {
         if (rxLen > 0) {
             if(in[0] == 'I'){
                 if(xQueueSend(image_out, (void *)in, pdMS_TO_TICKS(10)) != pdTRUE) {
-                    ESP_LOGI(TAG, "Incoming queue full!");
+                    if(xQueueReceive(image_out, (void *)dummy, pdMS_TO_TICKS(10))){
+                        xQueueSend(image_out, (void *)in, pdMS_TO_TICKS(10));
+                        ESP_LOGI(pcTaskGetName(NULL), "Received: %s", in);
+                    }
                 }
             }else if (xQueueSend(incoming, (void *)in, pdMS_TO_TICKS(10)) != pdTRUE) {
-                ESP_LOGI(TAG, "Incoming queue full!");
+                if(xQueueReceive(incoming, (void *)dummy, pdMS_TO_TICKS(10))){
+                        xQueueSend(incoming, (void *)in, pdMS_TO_TICKS(10));
+                        ESP_LOGI(pcTaskGetName(NULL), "Received: %s", in);
+                }
             } else {
                 ESP_LOGI(pcTaskGetName(NULL), "Received: %s", in);
             }
