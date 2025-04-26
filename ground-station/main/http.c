@@ -22,7 +22,7 @@ static QueueHandle_t *image_out;
 static TaskHandle_t *tx_task_handle;
 
 // Buffer to store the latest received LoRa message
-static char latest_message[200] = "No data received";
+static char latest_message[290] = "No data received";
 
 // ------------------------- STATUS ENDPOINT -------------------------
 static esp_err_t status_get_handler(httpd_req_t *req)
@@ -47,12 +47,12 @@ static esp_err_t sse_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
-    char in[140];
+    char in[280];
 
     while (1) {
         if (xQueueReceive(*incoming, (void *)&in, 0) == pdTRUE) {
             snprintf(latest_message, sizeof(latest_message), "%s", in); // Store latest message
-            char sse_data[220];
+            char sse_data[290];
             int len = snprintf(sse_data, sizeof(sse_data), "data: %s\n\n", in);
             if (httpd_resp_send_chunk(req, sse_data, len) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to send SSE data");

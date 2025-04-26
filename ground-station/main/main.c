@@ -58,7 +58,7 @@ void tx_task(void *pvParameters) {
 
 // LoRa Receive Task - Receive messages and put them in the incoming queue
 void rx_task(void *pvParameters) {
-    char in[140];
+    char in[280];
     char dummy[160];
 
     while (1) {
@@ -116,7 +116,7 @@ void app_main(void)
     LoRaConfig(spreadingFactor, bandwidth, codingRate, preambleLength, payloadLen, crcOn, invertIrq);
 
     outgoing = xQueueCreate(msg_queue_len, sizeof(char[100]));
-    incoming = xQueueCreate(msg_queue_len, sizeof(char[400]));
+    incoming = xQueueCreate(msg_queue_len, sizeof(char[280]));
     image_out = xQueueCreate(msg_queue_len, sizeof(char[110]));
 
     // I don't know what all this does, and I am too fearful to touch it
